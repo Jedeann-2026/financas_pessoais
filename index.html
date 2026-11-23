@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanças & Saldos - Controle Pessoal</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#13161f',
+                        darkcard: '#1c202b',
+                        darkborder: '#282d3c',
+                        emeraldbrand: '#10b981',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        html.dark input[type="month"]::-webkit-calendar-picker-indicator,
+        html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: 0.7;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 dark:bg-darkbg dark:text-slate-100 min-h-screen transition-colors duration-200">
+
+    <!-- TELA DE SELEÇÃO DE PERFIL / PIN -->
+    <div id="loginScreen" class="fixed inset-0 z-50 bg-slate-100 dark:bg-darkbg flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-3xl p-7 shadow-2xl space-y-6">
+            <div class="text-center space-y-2">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 mx-auto">
+                    <i class="fa-solid fa-wallet text-2xl"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">Finanças & Saldos</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Selecione seu perfil para carregar suas contas e lançamentos</p>
+            </div>
+
+            <!-- Cards de Seleção de Usuário -->
+            <div class="grid grid-cols-2 gap-3">
+                <button type="button" id="profileBtn_jedeann" onclick="selectUserProfile('jedeann')"
+                    class="p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 flex flex-col items-center gap-2 transition">
+                    <div class="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shadow">
+                        J
+                    </div>
+                    <span class="font-bold text-sm">Jedeann</span>
+                    <span class="text-[10px] text-emerald-500 font-semibold">Selecionado</span>
+                </button>
+
+                <button type="button" id="profileBtn_cristiane" onclick="selectUserProfile('cristiane')"
+                    class="p-4 rounded-2xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-darkbg hover:border-purple-500/50 flex flex-col items-center gap-2 transition">
+                    <div class="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-lg shadow">
+                        C
+                    </div>
+                    <span class="font-bold text-sm">Cristiane</span>
+                    <span class="text-[10px] text-slate-400 font-medium">Toque para escolher</span>
+                </button>
+            </div>
+
+            <!-- PIN de Acesso -->
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="loginPinInput" class="text-xs font-medium text-slate-500 dark:text-slate-400">PIN de Acesso (4 dígitos)</label>
+                        <button type="button" onclick="openChangePinModal()" class="text-[11px] text-emerald-500 hover:underline">
+                            Alterar PIN
+                        </button>
+                    </div>
+                    <input type="password" id="loginPinInput" inputmode="numeric" maxlength="6" required placeholder="••••"
+                        class="w-full text-center tracking-[0.5em] text-lg font-bold bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500">
+                    <p id="loginErrorMsg" class="hidden text-xs text-rose-500 mt-1.5 text-center font-medium"></p>
+                </div>
+
+                <button type="submit"
+                    class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Entrar no Painel</span>
+                </button>
+            </form>
+
+            <p class="text-[11px] text-center text-slate-400">
+                PIN inicial padrão: <strong class="text-slate-300">1234</strong> (pode ser alterado acima)
+            </p>
+        </div>
+    </div>
+
+    <!-- MODAL: ALTERAR PIN -->
+    <div id="changePinModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-darkborder pb-3">
+                <h3 class="text-base font-bold">Alterar PIN (<span id="pinModalUserLabel">Jedeann</span>)</h3>
+                <button onclick="closeModal('changePinModal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="saveNewPin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-400">PIN Atual</label>
+                    <input type="password" id="oldPinInput" inputmode="numeric" maxlength="6" required placeholder="••••"
+                        class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-400">Novo PIN (4 a 6 dígitos)</label>
+                    <input type="password" id="newPinInput" inputmode="numeric" minlength="4" maxlength="6" required placeholder="••••"
+                        class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('changePinModal')" class="px-3 py-2 rounded-xl border border-slate-200 dark:border-darkborder text-xs">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-semibold">Salvar PIN</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- APLICAÇÃO PRINCIPAL (OCULTA ATÉ LOGIN) -->
+    <div id="appWrapper" class="hidden">
+        <!-- HEADER SUPERIOR -->
+        <header class="border-b border-slate-200 dark:border-darkborder bg-white/80 dark:bg-darkbg/95 backdrop-blur sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+                <!-- Logo e Título -->
+                <div class="flex items-center gap-3">
+                    <div id="headerBrandIcon" class="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+                        <i class="fa-solid fa-wallet text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h1 class="text-lg font-bold tracking-tight leading-tight">Finanças & Saldos</h1>
+                            <span id="activeUserBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                <i class="fa-solid fa-user text-[9px]"></i>
+                                <span id="activeUserName">Jedeann</span>
+                            </span>
+                            <span id="syncBadge" onclick="syncNow()" title="Clique para sincronizar agora"
+                                class="cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                <i class="fa-solid fa-circle-notch fa-spin text-[9px]"></i>
+                                <span>Conectando...</span>
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Gestão individual de contas, receitas e despesas</p>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <!-- Toggle Dia / Noite -->
+                    <button id="themeToggle" onclick="toggleTheme()" title="Alternar Tema Dia/Noite"
+                        class="w-10 h-10 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-darkcard hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition">
+                        <i id="themeIcon" class="fa-solid fa-sun text-amber-400 text-base"></i>
+                    </button>
+
+                    <!-- Botão Transferir -->
+                    <button onclick="openTransferModal()"
+                        class="px-3.5 py-2 rounded-xl border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-sm font-medium flex items-center gap-2 transition">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
+                        <span>Transferir</span>
+                    </button>
+
+                    <!-- Botão Nova Conta -->
+                    <button onclick="openAccountModal()"
+                        class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-white dark:bg-darkcard hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium flex items-center gap-2 transition">
+                        <i class="fa-solid fa-building-columns text-xs text-slate-500 dark:text-slate-400"></i>
+                        <span>Nova Conta</span>
+                    </button>
+
+                    <!-- Botão Nova Transação -->
+                    <button onclick="openTransactionModal()"
+                        class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Nova Transação</span>
+                    </button>
+
+                    <!-- Botão Trocar Usuário / Sair -->
+                    <button onclick="logoutUser()" title="Trocar de Usuário"
+                        class="px-3 py-2 rounded-xl border border-slate-200 dark:border-darkborder bg-slate-100 dark:bg-darkcard hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 text-xs font-medium flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Trocar Usuário</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- CONTEÚDO PRINCIPAL -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+            <!-- BARRA DE PERÍODO E FERRAMENTAS -->
+            <section class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 pl-1">PERÍODO:</span>
+                    <input type="month" id="periodFilter" onchange="renderAll()"
+                        class="bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-emerald-500">
+                    <button onclick="clearPeriodFilter()" id="btnViewAll"
+                        class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline px-2 py-1">
+                        Ver Todos
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <button onclick="loadSampleData()"
+                        class="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-2 transition">
+                        <i class="fa-solid fa-flask text-slate-400"></i>
+                        <span>Dados Exemplo</span>
+                    </button>
+                    <button onclick="exportCSV()"
+                        class="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-xs font-medium flex items-center gap-2 transition">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Exportar CSV</span>
+                    </button>
+                    <button onclick="requestConfirmClearAll()" title="Limpar todos os lançamentos deste usuário"
+                        class="w-8 h-8 rounded-xl hover:bg-rose-500/10 text-rose-500 flex items-center justify-center transition">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- MINHAS CONTAS & SALDOS -->
+            <section class="space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-landmark text-emerald-500 text-sm"></i>
+                        <h2 class="text-base font-bold">Minhas Contas & Saldos (<span id="accountsOwnerTitle">Jedeann</span>)</h2>
+                    </div>
+                    <div class="text-sm text-slate-500 dark:text-slate-400">
+                        Patrimônio Consolidado: <strong id="consolidatedBalance" class="text-emerald-600 dark:text-emerald-400 font-bold text-base ml-1">R$ 0,00</strong>
+                    </div>
+                </div>
+
+                <!-- Grid de Contas -->
+                <div id="accountsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+
+                <!-- Card de Saldo Projetado (Saldo - Despesas Pendentes + Receitas Pendentes) -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            SALDO PROJETADO (SALDO - DESPESAS PENDENTES + RECEITAS PENDENTES)
+                        </p>
+                        <p id="projectedBalance" class="text-2xl font-bold text-indigo-500 dark:text-indigo-400">
+                            R$ 0,00
+                        </p>
+                        <p id="projectedFormulaDetail" class="text-xs text-slate-500 dark:text-slate-400">
+                            Calculando saldo com lançamentos pendentes...
+                        </p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-calculator text-lg"></i>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CARDS DE KPIS DO PERÍODO -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Receitas -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                    <div class="space-y-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">RECEITAS NO PERÍODO</p>
+                        <p id="kpiIncome" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">R$ 0,00</p>
+                        <p class="text-xs text-amber-500 font-medium">Pendente: <span id="kpiIncomePending">R$ 0,00</span></p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-trend-up text-lg"></i>
+                    </div>
+                </div>
+
+                <!-- Despesas -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                    <div class="space-y-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">DESPESAS NO PERÍODO</p>
+                        <p id="kpiExpense" class="text-2xl font-bold text-rose-500">R$ 0,00</p>
+                        <p class="text-xs text-amber-500 font-medium">Pendente: <span id="kpiExpensePending">R$ 0,00</span></p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-trend-down text-lg"></i>
+                    </div>
+                </div>
+
+                <!-- Balanço do Período -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                    <div class="space-y-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">BALANÇO DO PERÍODO</p>
+                        <p id="kpiBalance" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">R$ 0,00</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Receitas pagas menos despesas pagas</p>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                        <i class="fa-solid fa-scale-balanced text-lg"></i>
+                    </div>
+                </div>
+
+                <!-- Taxa de Poupança -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                    <div class="space-y-2 flex-1 pr-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">TAXA DE POUPANÇA</p>
+                        <p id="kpiSavingsRate" class="text-2xl font-bold text-indigo-500 dark:text-indigo-400">0.0%</p>
+                        <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                            <div id="kpiSavingsBar" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="w-11 h-11 rounded-xl bg-indigo-500/15 text-indigo-400 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-piggy-bank text-lg"></i>
+                    </div>
+                </div>
+            </section>
+
+            <!-- GRÁFICOS -->
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Despesas por Categoria -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-emerald-500"></i>
+                            <h3 class="text-base font-bold">Despesas por Categoria</h3>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Distribuição das despesas pagas no período</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                        <canvas id="categoryChart"></canvas>
+                        <div id="emptyCategoryChart" class="hidden flex-col items-center justify-center text-slate-500 dark:text-slate-500 py-8">
+                            <i class="fa-solid fa-chart-simple text-3xl mb-2 opacity-60"></i>
+                            <span class="text-xs">Nenhuma despesa paga neste período</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saldos Atuais por Conta -->
+                <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 shadow-sm flex flex-col">
+                    <div class="mb-4">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-indigo-400"></i>
+                            <h3 class="text-base font-bold">Saldos Atuais por Conta</h3>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Comparativo do saldo acumulado em cada instituição</p>
+                    </div>
+                    <div class="relative flex-1 min-h-[240px] flex items-center justify-center">
+                        <canvas id="accountsChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HISTÓRICO DE LANÇAMENTOS -->
+            <section class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-base font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-list-ul text-emerald-500"></i>
+                            <span>Lançamentos & Movimentações</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Clique no status para alternar rapidamente entre Pago e Pendente</p>
+                    </div>
+
+                    <!-- Filtros da Tabela -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="searchFilter" oninput="renderTransactions()" placeholder="Buscar descrição..."
+                                class="bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500">
+                        </div>
+
+                        <select id="typeFilter" onchange="renderTransactions()"
+                            class="bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="all">Todos os Tipos</option>
+                            <option value="income">Receitas</option>
+                            <option value="expense">Despesas</option>
+                            <option value="transfer">Transferências</option>
+                        </select>
+
+                        <select id="categoryFilter" onchange="renderTransactions()"
+                            class="bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="all">Todas Categorias</option>
+                        </select>
+
+                        <select id="accountFilter" onchange="renderTransactions()"
+                            class="bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500">
+                            <option value="all">Todas as Contas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tabela -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-200 dark:border-darkborder text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                <th class="py-3 px-3">Data</th>
+                                <th class="py-3 px-3">Descrição</th>
+                                <th class="py-3 px-3">Categoria</th>
+                                <th class="py-3 px-3">Conta</th>
+                                <th class="py-3 px-3 text-right">Valor</th>
+                                <th class="py-3 px-3 text-center">Status</th>
+                                <th class="py-3 px-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTableBody" class="divide-y divide-slate-200 dark:divide-darkborder text-sm"></tbody>
+                    </table>
+                    <div id="emptyTransactions" class="hidden py-10 text-center text-slate-500 dark:text-slate-400 text-sm">
+                        Nenhum lançamento encontrado para os filtros selecionados.
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL: NOVA / EDITAR TRANSAÇÃO -->
+    <div id="transactionModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-darkborder pb-3">
+                <h3 id="txModalTitle" class="text-base font-bold">Nova Transação</h3>
+                <button onclick="closeModal('transactionModal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="txForm" onsubmit="saveTransaction(event)" class="space-y-4">
+                <input type="hidden" id="txId">
+                
+                <!-- Tipo -->
+                <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-darkbg rounded-xl">
+                    <button type="button" id="btnTypeExpense" onclick="setTxType('expense')"
+                        class="py-2 rounded-lg text-xs font-bold transition bg-rose-500 text-white shadow">
+                        Despesa
+                    </button>
+                    <button type="button" id="btnTypeIncome" onclick="setTxType('income')"
+                        class="py-2 rounded-lg text-xs font-bold transition text-slate-500 dark:text-slate-400">
+                        Receita
+                    </button>
+                </div>
+                <input type="hidden" id="txType" value="expense">
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Descrição</label>
+                    <input type="text" id="txDescription" required placeholder="Ex: Conta de Luz, Telefone, Mercado..."
+                        class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Valor (R$)</label>
+                        <input type="number" id="txAmount" step="0.01" min="0.01" required placeholder="0,00"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Data</label>
+                        <input type="date" id="txDate" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Categoria</label>
+                        <select id="txCategory" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Conta Bancária</label>
+                        <select id="txAccount" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Forma de Pagamento</label>
+                        <select id="txPaymentMethod" onchange="handlePaymentMethodChange()"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="debit_pix">Débito / PIX / Dinheiro</option>
+                            <option value="credit_card">Cartão de Crédito</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Status</label>
+                        <select id="txStatus"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="paid">Pago / Recebido</option>
+                            <option value="pending">Pendente (Fatura)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('transactionModal')"
+                        class="px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder text-xs font-medium hover:bg-slate-100 dark:hover:bg-slate-800">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold">
+                        Salvar Lançamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: NOVA / EDITAR CONTA -->
+    <div id="accountModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-darkborder pb-3">
+                <h3 id="accModalTitle" class="text-base font-bold">Gerenciar Conta</h3>
+                <button onclick="closeModal('accountModal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="accForm" onsubmit="saveAccount(event)" class="space-y-4">
+                <input type="hidden" id="accId">
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Nome da Instituição / Conta</label>
+                    <input type="text" id="accName" required placeholder="Ex: PagBank"
+                        class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Tipo de Conta</label>
+                        <select id="accType"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                            <option value="Conta Digital">Conta Digital</option>
+                            <option value="Conta Corrente">Conta Corrente</option>
+                            <option value="Poupança">Poupança</option>
+                            <option value="Carteira Física">Carteira Física</option>
+                            <option value="Investimentos">Investimentos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Saldo Inicial (R$)</label>
+                        <input type="number" id="accInitialBalance" step="0.01" required placeholder="0,00"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Cor de Destaque</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="accColor" value="#10b981" class="w-10 h-9 rounded cursor-pointer bg-transparent border-0">
+                        <span class="text-xs text-slate-400">Escolha a cor do card e do gráfico</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <button type="button" id="btnDeleteAccount" onclick="requestDeleteAccount()" class="hidden text-xs text-rose-500 hover:underline">
+                        Excluir Conta
+                    </button>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="button" onclick="closeModal('accountModal')"
+                            class="px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder text-xs font-medium">
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                            class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold">
+                            Salvar Conta
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: TRANSFERÊNCIA ENTRE CONTAS -->
+    <div id="transferModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-darkborder pb-3">
+                <h3 class="text-base font-bold">Transferir Entre Contas</h3>
+                <button onclick="closeModal('transferModal')" class="text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveTransfer(event)" class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Conta Origem</label>
+                        <select id="trFromAccount" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Conta Destino</label>
+                        <select id="trToAccount" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Valor (R$)</label>
+                        <input type="number" id="trAmount" step="0.01" min="0.01" required placeholder="0,00"
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Data</label>
+                        <input type="date" id="trDate" required
+                            class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1 text-slate-500 dark:text-slate-400">Observação (Opcional)</label>
+                    <input type="text" id="trDesc" placeholder="Ex: PIX entre contas"
+                        class="w-full bg-slate-100 dark:bg-darkbg border border-slate-200 dark:border-darkborder rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeModal('transferModal')"
+                        class="px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder text-xs font-medium">
+                        Cancelar
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">
+                        Confirmar Transferência
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO PERSONALIZADO -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/65 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <h3 id="confirmModalTitle" class="text-base font-bold">Confirmar Ação</h3>
+            <p id="confirmModalText" class="text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="closeModal('confirmModal')"
+                    class="px-4 py-2 rounded-xl border border-slate-200 dark:border-darkborder text-xs font-medium">
+                    Cancelar
+                </button>
+                <button type="button" id="confirmModalActionBtn"
+                    class="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-semibold">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST DE NOTIFICAÇÃO -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-[70] space-y-2 pointer-events-none"></div>
+
+    <script>
+        // =========================================================================
+        // 1. CREDENCIAIS DO SUPABASE CONFIGURADAS
+        // =========================================================================
+        const SUPABASE_URL = "https://mjkqkyuolsqhtxwzivof.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_taL59MpBnTvHmpfD8eMSnw_f2QuR6w-";
+        const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // =========================================================================
+        // 2. PERFIS DE USUÁRIO & AUTENTICAÇÃO POR PIN
+        // =========================================================================
+        const USERS_CONFIG = {
+            jedeann: {
+                id: 'jedeann',
+                name: 'Jedeann',
+                color: '#10b981',
+                defaultPin: '1234',
+                defaultAccount: {
+                    id: 'acc_pagbank',
+                    name: 'PagBank',
+                    type: 'Conta Digital',
+                    initialBalance: 16897.53,
+                    color: '#10b981',
+                    icon: 'fa-mobile-screen'
+                }
+            },
+            cristiane: {
+                id: 'cristiane',
+                name: 'Cristiane',
+                color: '#8b5cf6',
+                defaultPin: '1234',
+                defaultAccount: {
+                    id: 'acc_cristiane_1',
+                    name: 'Conta Principal',
+                    type: 'Conta Digital',
+                    initialBalance: 0.00,
+                    color: '#8b5cf6',
+                    icon: 'fa-mobile-screen'
+                }
+            }
+        };
+
+        let selectedLoginUser = 'jedeann';
+        let currentUser = null;
+
+        function getUserPin(userId) {
+            return localStorage.getItem(`financas_pin_${userId}`) || USERS_CONFIG[userId].defaultPin;
+        }
+
+        function selectUserProfile(userId) {
+            selectedLoginUser = userId;
+            document.getElementById('loginErrorMsg').classList.add('hidden');
+
+            ['jedeann', 'cristiane'].forEach(uid => {
+                const btn = document.getElementById(`profileBtn_${uid}`);
+                const sub = btn.querySelector('span:last-child');
+                if (uid === userId) {
+                    const borderClass = uid === 'jedeann' ? 'border-emerald-500 bg-emerald-500/10' : 'border-purple-500 bg-purple-500/10';
+                    const textClass = uid === 'jedeann' ? 'text-emerald-500' : 'text-purple-400';
+                    btn.className = `p-4 rounded-2xl border-2 ${borderClass} flex flex-col items-center gap-2 transition`;
+                    sub.className = `text-[10px] ${textClass} font-semibold`;
+                    sub.textContent = 'Selecionado';
+                } else {
+                    btn.className = 'p-4 rounded-2xl border border-slate-200 dark:border-darkborder bg-slate-50 dark:bg-darkbg flex flex-col items-center gap-2 transition opacity-75 hover:opacity-100';
+                    sub.className = 'text-[10px] text-slate-400 font-medium';
+                    sub.textContent = 'Toque para escolher';
+                }
+            });
+            document.getElementById('loginPinInput').focus();
+        }
+
+        async function handleLoginSubmit(e) {
+            e.preventDefault();
+            const enteredPin = document.getElementById('loginPinInput').value.trim();
+            const expectedPin = getUserPin(selectedLoginUser);
+            const errEl = document.getElementById('loginErrorMsg');
+
+            if (enteredPin !== expectedPin) {
+                errEl.textContent = 'PIN incorreto. Tente novamente.';
+                errEl.classList.remove('hidden');
+                document.getElementById('loginPinInput').value = '';
+                document.getElementById('loginPinInput').focus();
+                return;
+            }
+
+            errEl.classList.add('hidden');
+            currentUser = USERS_CONFIG[selectedLoginUser];
+            sessionStorage.setItem('financas_logged_user', currentUser.id);
+            await enterAppForUser(currentUser);
+        }
+
+        async function enterAppForUser(userObj) {
+            currentUser = userObj;
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appWrapper').classList.remove('hidden');
+
+            document.getElementById('activeUserName').textContent = currentUser.name;
+            document.getElementById('accountsOwnerTitle').textContent = currentUser.name;
+
+            const badge = document.getElementById('activeUserBadge');
+            if (currentUser.id === 'cristiane') {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30';
+            } else {
+                badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+            }
+
+            await loadAllData();
+        }
+
+        function logoutUser() {
+            sessionStorage.removeItem('financas_logged_user');
+            currentUser = null;
+            accounts = [];
+            transactions = [];
+            document.getElementById('loginPinInput').value = '';
+            document.getElementById('appWrapper').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+            selectUserProfile(selectedLoginUser);
+        }
+
+        function openChangePinModal() {
+            document.getElementById('pinModalUserLabel').textContent = USERS_CONFIG[selectedLoginUser].name;
+            document.getElementById('oldPinInput').value = '';
+            document.getElementById('newPinInput').value = '';
+            openModal('changePinModal');
+        }
+
+        function saveNewPin(e) {
+            e.preventDefault();
+            const oldPin = document.getElementById('oldPinInput').value.trim();
+            const newPin = document.getElementById('newPinInput').value.trim();
+
+            if (oldPin !== getUserPin(selectedLoginUser)) {
+                showToast('PIN atual incorreto.', 'error');
+                return;
+            }
+            if (!/^\d{4,6}$/.test(newPin)) {
+                showToast('O novo PIN deve conter de 4 a 6 números.', 'error');
+                return;
+            }
+
+            localStorage.setItem(`financas_pin_${selectedLoginUser}`, newPin);
+            closeModal('changePinModal');
+            showToast(`PIN de ${USERS_CONFIG[selectedLoginUser].name} atualizado com sucesso!`, 'success');
+        }
+
+        // =========================================================================
+        // 3. CONFIGURAÇÕES & ESTADO GLOBAL
+        // =========================================================================
+        const STORAGE_KEY_THEME = 'financas_saldos_theme';
+
+        function getStorageKeyAccounts() {
+            return `financas_saldos_accounts_${currentUser.id}`;
+        }
+
+        function getStorageKeyTxs() {
+            return `financas_saldos_txs_${currentUser.id}`;
+        }
+
+        const CATEGORIES = [
+            { id: 'energia', name: 'Energia', icon: 'fa-bolt-lightning', color: '#eab308', type: 'expense' },
+            { id: 'telefone', name: 'Telefone', icon: 'fa-mobile-screen-button', color: '#06b6d4', type: 'expense' },
+            { id: 'alimentacao', name: 'Alimentação', icon: 'fa-utensils', color: '#f97316', type: 'expense' },
+            { id: 'moradia', name: 'Moradia / Aluguel', icon: 'fa-house', color: '#8b5cf6', type: 'expense' },
+            { id: 'transporte', name: 'Transporte', icon: 'fa-car', color: '#3b82f6', type: 'expense' },
+            { id: 'saude', name: 'Saúde', icon: 'fa-heart-pulse', color: '#ef4444', type: 'expense' },
+            { id: 'lazer', name: 'Lazer & Assinaturas', icon: 'fa-film', color: '#ec4899', type: 'expense' },
+            { id: 'educacao', name: 'Educação', icon: 'fa-graduation-cap', color: '#14b8a6', type: 'expense' },
+            { id: 'outros_gastos', name: 'Outras Despesas', icon: 'fa-bag-shopping', color: '#64748b', type: 'expense' },
+            { id: 'salario', name: 'Salário / Pró-labore', icon: 'fa-briefcase', color: '#10b981', type: 'income' },
+            { id: 'servicos', name: 'Consultoria / Serviços', icon: 'fa-laptop-code', color: '#22c55e', type: 'income' },
+            { id: 'rendimentos', name: 'Rendimentos / Extras', icon: 'fa-coins', color: '#84cc16', type: 'income' }
+        ];
+
+        let accounts = [];
+        let transactions = [];
+        let categoryChartInstance = null;
+        let accountsChartInstance = null;
+
+        // =========================================================================
+        // 4. NOTIFICAÇÕES TOAST & MODAL DE CONFIRMAÇÃO
+        // =========================================================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                info: 'bg-slate-800 text-white border border-slate-700'
+            };
+            toast.className = `${colors[type] || colors.info} px-4 py-2.5 rounded-xl shadow-lg text-xs font-semibold flex items-center gap-2 transition-opacity duration-300`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        function openConfirmDialog(title, text, onConfirm) {
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalText').textContent = text;
+            const btn = document.getElementById('confirmModalActionBtn');
+            btn.onclick = async () => {
+                closeModal('confirmModal');
+                await onConfirm();
+            };
+            openModal('confirmModal');
+        }
+
+        // =========================================================================
+        // 5. SINCRONIZAÇÃO SUPABASE FILTRADA POR USUÁRIO (OWNER)
+        // =========================================================================
+        function setSyncBadge(status, text) {
+            const badge = document.getElementById('syncBadge');
+            if (!badge) return;
+
+            if (status === 'online') {
+                badge.className = 'cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+                badge.innerHTML = `<i class="fa-solid fa-cloud-check text-[9px]"></i><span>${text || 'Supabase Conectado'}</span>`;
+            } else if (status === 'syncing') {
+                badge.className = 'cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30';
+                badge.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-[9px]"></i><span>${text || 'Sincronizando...'}</span>`;
+            } else {
+                badge.className = 'cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30';
+                badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-[9px]"></i><span>${text || 'Modo Local'}</span>`;
+            }
+        }
+
+        function mapAccountToRow(a) {
+            return {
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                initial_balance: Number(a.initialBalance) || 0,
+                color: a.color || currentUser.color,
+                icon: a.icon || 'fa-mobile-screen',
+                owner: currentUser.id
+            };
+        }
+
+        function mapRowToAccount(r) {
+            return {
+                id: r.id,
+                name: r.name,
+                type: r.type,
+                initialBalance: Number(r.initial_balance) || 0,
+                color: r.color || '#10b981',
+                icon: r.icon || 'fa-mobile-screen',
+                owner: r.owner || currentUser.id
+            };
+        }
+
+        function mapTxToRow(t) {
+            return {
+                id: t.id,
+                type: t.type,
+                description: t.description,
+                amount: Number(t.amount) || 0,
+                tx_date: t.date,
+                category: t.category,
+                account_id: t.accountId,
+                to_account_id: t.toAccountId || null,
+                status: t.status || 'paid',
+                payment_method: t.paymentMethod || 'debit_pix',
+                owner: currentUser.id
+            };
+        }
+
+        function mapRowToTx(r) {
+            return {
+                id: r.id,
+                type: r.type,
+                description: r.description,
+                amount: Number(r.amount) || 0,
+                date: r.tx_date,
+                category: r.category,
+                accountId: r.account_id,
+                toAccountId: r.to_account_id || null,
+                status: r.status || 'paid',
+                paymentMethod: r.payment_method || 'debit_pix',
+                owner: r.owner || currentUser.id
+            };
+        }
+
+        function saveLocalCache() {
+            if (!currentUser) return;
+            localStorage.setItem(getStorageKeyAccounts(), JSON.stringify(accounts));
+            localStorage.setItem(getStorageKeyTxs(), JSON.stringify(transactions));
+        }
+
+        async function loadAllData() {
+            if (!currentUser) return;
+
+            const cachedAcc = localStorage.getItem(getStorageKeyAccounts());
+            const cachedTxs = localStorage.getItem(getStorageKeyTxs());
+
+            if (cachedAcc) {
+                accounts = JSON.parse(cachedAcc);
+            } else {
+                accounts = [{ ...currentUser.defaultAccount }];
+            }
+
+            transactions = cachedTxs ? JSON.parse(cachedTxs) : [];
+            renderAll();
+
+            setSyncBadge('syncing', 'Sincronizando...');
+            try {
+                const [{ data: accRows, error: accErr }, { data: txRows, error: txErr }] = await Promise.all([
+                    sbClient.from('fin_contas').select('*').eq('owner', currentUser.id).order('created_at', { ascending: true }),
+                    sbClient.from('fin_lancamentos').select('*').eq('owner', currentUser.id).order('tx_date', { ascending: false })
+                ]);
+
+                if (accErr) throw accErr;
+                if (txErr) throw txErr;
+
+                if (accRows && accRows.length > 0) {
+                    accounts = accRows.map(mapRowToAccount);
+                } else {
+                    accounts = [{ ...currentUser.defaultAccount }];
+                    await sbClient.from('fin_contas').upsert(mapAccountToRow(accounts[0]));
+                }
+
+                transactions = (txRows || []).map(mapRowToTx);
+                saveLocalCache();
+                renderAll();
+                setSyncBadge('online', 'Supabase Conectado');
+            } catch (err) {
+                console.error('Erro Supabase:', err);
+                setSyncBadge('local', 'Erro / Modo Local');
+                showToast('Verifique se a coluna owner foi criada no Supabase.', 'error');
+            }
+        }
+
+        async function syncNow() {
+            await loadAllData();
+        }
+
+        // =========================================================================
+        // 6. INICIALIZAÇÃO & TEMA
+        // =========================================================================
+        document.addEventListener('DOMContentLoaded', async () => {
+            initTheme();
+
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            document.getElementById('periodFilter').value = `${yyyy}-${mm}`;
+
+            populateCategorySelects();
+
+            const savedLoggedUser = sessionStorage.getItem('financas_logged_user');
+            if (savedLoggedUser && USERS_CONFIG[savedLoggedUser]) {
+                await enterAppForUser(USERS_CONFIG[savedLoggedUser]);
+            } else {
+                selectUserProfile('jedeann');
+            }
+        });
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem(STORAGE_KEY_THEME) || 'dark';
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (savedTheme === 'dark') {
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-amber-400 text-base';
+            } else {
+                html.classList.remove('dark');
+                icon.className = 'fa-solid fa-moon text-slate-700 text-base';
+            }
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem(STORAGE_KEY_THEME, isDark ? 'dark' : 'light');
+            initTheme();
+            renderCharts();
+        }
+
+        // =========================================================================
+        // 7. FORMATAÇÃO & CÁLCULOS
+        // =========================================================================
+        function formatCurrency(val) {
+            return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function formatDateBR(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        function getAccountBalance(accountId) {
+            const acc = accounts.find(a => a.id === accountId);
+            if (!acc) return 0;
+
+            let balance = parseFloat(acc.initialBalance) || 0;
+
+            transactions.forEach(tx => {
+                if (tx.status !== 'paid') return;
+                const amount = parseFloat(tx.amount) || 0;
+
+                if (tx.type === 'income' && tx.accountId === accountId) {
+                    balance += amount;
+                } else if (tx.type === 'expense' && tx.accountId === accountId) {
+                    balance -= amount;
+                } else if (tx.type === 'transfer') {
+                    if (tx.accountId === accountId) balance -= amount;
+                    if (tx.toAccountId === accountId) balance += amount;
+                }
+            });
+
+            return balance;
+        }
+
+        function renderProjectedBalance() {
+            const currentConsolidated = accounts.reduce((sum, acc) => sum + getAccountBalance(acc.id), 0);
+
+            let pendingIncome = 0;
+            let pendingExpense = 0;
+
+            transactions.forEach(tx => {
+                const val = parseFloat(tx.amount) || 0;
+                if (tx.status === 'pending') {
+                    if (tx.type === 'income') pendingIncome += val;
+                    if (tx.type === 'expense') pendingExpense += val;
+                }
+            });
+
+            const projected = currentConsolidated - pendingExpense + pendingIncome;
+
+            const el = document.getElementById('projectedBalance');
+            const detailEl = document.getElementById('projectedFormulaDetail');
+
+            if (el) {
+                el.textContent = formatCurrency(projected);
+                el.className = `text-2xl font-bold ${projected < 0 ? 'text-rose-500' : 'text-indigo-500 dark:text-indigo-400'}`;
+            }
+
+            if (detailEl) {
+                detailEl.textContent = `Saldo ${formatCurrency(currentConsolidated)} - Desp. pend. ${formatCurrency(pendingExpense)} + Rec. pend. ${formatCurrency(pendingIncome)}`;
+            }
+        }
+
+        // =========================================================================
+        // 8. RENDERIZAÇÃO DE INTERFACE & GRÁFICOS
+        // =========================================================================
+        function renderAll() {
+            populateAccountSelects();
+            renderAccounts();
+            renderProjectedBalance();
+            renderKPIs();
+            renderTransactions();
+            renderCharts();
+        }
+
+        function renderAccounts() {
+            const grid = document.getElementById('accountsGrid');
+            grid.innerHTML = '';
+
+            let totalConsolidated = 0;
+
+            accounts.forEach(acc => {
+                const currentBalance = getAccountBalance(acc.id);
+                totalConsolidated += currentBalance;
+
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-darkcard border border-slate-200 dark:border-darkborder rounded-2xl p-5 shadow-sm hover:border-emerald-500/40 transition relative group';
+                card.innerHTML = `
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm" style="background-color: ${acc.color}">
+                                <i class="fa-solid ${acc.icon || 'fa-mobile-screen'} text-base"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm leading-tight">${acc.name}</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">${acc.type}</p>
+                            </div>
+                        </div>
+                        <button onclick="openAccountModal('${acc.id}')" title="Editar Conta"
+                            class="text-slate-400 hover:text-emerald-400 p-1 transition">
+                            <i class="fa-solid fa-pen text-xs"></i>
+                        </button>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">SALDO ATUAL</p>
+                        <p class="text-xl font-bold mt-0.5 ${currentBalance < 0 ? 'text-rose-500' : ''}">${formatCurrency(currentBalance)}</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            document.getElementById('consolidatedBalance').textContent = formatCurrency(totalConsolidated);
+        }
+
+        function getFilteredByPeriodTransactions() {
+            const period = document.getElementById('periodFilter').value;
+            if (!period) return transactions;
+            return transactions.filter(tx => tx.date && tx.date.startsWith(period));
+        }
+
+        function clearPeriodFilter() {
+            document.getElementById('periodFilter').value = '';
+            renderAll();
+        }
+
+        function renderKPIs() {
+            const periodTxs = getFilteredByPeriodTransactions();
+
+            let incomePaid = 0, incomePending = 0;
+            let expensePaid = 0, expensePending = 0;
+
+            periodTxs.forEach(tx => {
+                const val = parseFloat(tx.amount) || 0;
+                if (tx.type === 'income') {
+                    if (tx.status === 'paid') incomePaid += val;
+                    else incomePending += val;
+                } else if (tx.type === 'expense') {
+                    if (tx.status === 'paid') expensePaid += val;
+                    else expensePending += val;
+                }
+            });
+
+            const balance = incomePaid - expensePaid;
+            const savingsRate = incomePaid > 0 ? Math.max(0, ((incomePaid - expensePaid) / incomePaid) * 100) : 0;
+
+            document.getElementById('kpiIncome').textContent = formatCurrency(incomePaid);
+            document.getElementById('kpiIncomePending').textContent = formatCurrency(incomePending);
+            document.getElementById('kpiExpense').textContent = formatCurrency(expensePaid);
+            document.getElementById('kpiExpensePending').textContent = formatCurrency(expensePending);
+
+            const balEl = document.getElementById('kpiBalance');
+            balEl.textContent = formatCurrency(balance);
+            balEl.className = `text-2xl font-bold ${balance < 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`;
+
+            document.getElementById('kpiSavingsRate').textContent = `${savingsRate.toFixed(1)}%`;
+            document.getElementById('kpiSavingsBar').style.width = `${Math.min(100, savingsRate)}%`;
+        }
+
+        function renderTransactions() {
+            const tbody = document.getElementById('transactionsTableBody');
+            const emptyDiv = document.getElementById('emptyTransactions');
+            tbody.innerHTML = '';
+
+            let filtered = getFilteredByPeriodTransactions();
+
+            const search = document.getElementById('searchFilter').value.toLowerCase().trim();
+            const typeF = document.getElementById('typeFilter').value;
+            const catF = document.getElementById('categoryFilter').value;
+            const accF = document.getElementById('accountFilter').value;
+
+            filtered = filtered.filter(tx => {
+                if (search && !tx.description.toLowerCase().includes(search)) return false;
+                if (typeF !== 'all' && tx.type !== typeF) return false;
+                if (catF !== 'all' && tx.category !== catF) return false;
+                if (accF !== 'all' && tx.accountId !== accF && tx.toAccountId !== accF) return false;
+                return true;
+            });
+
+            filtered.sort((a, b) => b.date.localeCompare(a.date));
+
+            if (filtered.length === 0) {
+                emptyDiv.classList.remove('hidden');
+                return;
+            }
+            emptyDiv.classList.add('hidden');
+
+            filtered.forEach(tx => {
+                const cat = CATEGORIES.find(c => c.id === tx.category) || { name: 'Transferência', icon: 'fa-arrow-right-arrow-left', color: '#6366f1' };
+                const acc = accounts.find(a => a.id === tx.accountId) || { name: 'Conta', color: '#64748b' };
+                const toAcc = tx.toAccountId ? accounts.find(a => a.id === tx.toAccountId) : null;
+
+                const isExpense = tx.type === 'expense';
+                const isTransfer = tx.type === 'transfer';
+
+                const ccBadge = (!isTransfer && tx.paymentMethod === 'credit_card')
+                    ? `<span class="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/30"><i class="fa-regular fa-credit-card"></i> Crédito</span>`
+                    : '';
+
+                const amountClass = isTransfer
+                    ? 'text-indigo-400'
+                    : (isExpense ? 'text-rose-500' : 'text-emerald-500');
+                const sign = isTransfer ? '' : (isExpense ? '- ' : '+ ');
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 dark:hover:bg-slate-800/40 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-3 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">${formatDateBR(tx.date)}</td>
+                    <td class="py-3 px-3 font-medium">${tx.description}${ccBadge}</td>
+                    <td class="py-3 px-3 whitespace-nowrap">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-darkbg">
+                            <i class="fa-solid ${cat.icon}" style="color: ${cat.color}"></i>
+                            <span>${cat.name}</span>
+                        </span>
+                    </td>
+                    <td class="py-3 px-3 whitespace-nowrap text-xs">
+                        <span class="inline-flex items-center gap-1.5 font-medium">
+                            <span class="w-2 h-2 rounded-full" style="background-color: ${acc.color}"></span>
+                            ${acc.name} ${toAcc ? `<i class="fa-solid fa-arrow-right text-[10px] mx-1 text-slate-400"></i> ${toAcc.name}` : ''}
+                        </span>
+                    </td>
+                    <td class="py-3 px-3 whitespace-nowrap text-right font-bold ${amountClass}">
+                        ${sign}${formatCurrency(parseFloat(tx.amount))}
+                    </td>
+                    <td class="py-3 px-3 whitespace-nowrap text-center">
+                        <button onclick="toggleTxStatus('${tx.id}')"
+                            class="px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
+                                tx.status === 'paid'
+                                    ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25'
+                                    : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/25'
+                            }">
+                            ${tx.status === 'paid' ? 'Pago' : 'Pendente'}
+                        </button>
+                    </td>
+                    <td class="py-3 px-3 whitespace-nowrap text-right space-x-1">
+                        ${!isTransfer ? `
+                        <button onclick="openTransactionModal('${tx.id}')" title="Editar" class="p-1.5 text-slate-400 hover:text-emerald-400 transition">
+                            <i class="fa-solid fa-pen text-xs"></i>
+                        </button>` : ''}
+                        <button onclick="requestDeleteTransaction('${tx.id}')" title="Excluir" class="p-1.5 text-slate-400 hover:text-rose-500 transition">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#94a3b8' : '#475569';
+            const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+            const periodTxs = getFilteredByPeriodTransactions().filter(tx => tx.type === 'expense' && tx.status === 'paid');
+            const catTotals = {};
+
+            periodTxs.forEach(tx => {
+                catTotals[tx.category] = (catTotals[tx.category] || 0) + parseFloat(tx.amount);
+            });
+
+            const catLabels = [];
+            const catValues = [];
+            const catColors = [];
+
+            Object.keys(catTotals).forEach(catId => {
+                const catObj = CATEGORIES.find(c => c.id === catId) || { name: catId, color: '#64748b' };
+                catLabels.push(catObj.name);
+                catValues.push(catTotals[catId]);
+                catColors.push(catObj.color);
+            });
+
+            const catCanvas = document.getElementById('categoryChart');
+            const emptyCat = document.getElementById('emptyCategoryChart');
+
+            if (categoryChartInstance) categoryChartInstance.destroy();
+
+            if (catValues.length === 0) {
+                catCanvas.classList.add('hidden');
+                emptyCat.classList.remove('hidden');
+                emptyCat.classList.add('flex');
+            } else {
+                catCanvas.classList.remove('hidden');
+                emptyCat.classList.add('hidden');
+                emptyCat.classList.remove('flex');
+
+                categoryChartInstance = new Chart(catCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: catLabels,
+                        datasets: [{
+                            data: catValues,
+                            backgroundColor: catColors,
+                            borderWidth: 0,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '68%',
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { color: textColor, font: { size: 11 }, boxWidth: 12 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ` ${ctx.label}: ${formatCurrency(ctx.parsed)}`
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const accCanvas = document.getElementById('accountsChart');
+            if (accountsChartInstance) accountsChartInstance.destroy();
+
+            const accLabels = accounts.map(a => a.name);
+            const accBalances = accounts.map(a => getAccountBalance(a.id));
+            const accColors = accounts.map(a => a.color || '#10b981');
+
+            accountsChartInstance = new Chart(accCanvas, {
+                type: 'bar',
+                data: {
+                    labels: accLabels,
+                    datasets: [{
+                        label: 'Saldo Atual',
+                        data: accBalances,
+                        backgroundColor: accColors,
+                        borderRadius: 10,
+                        barPercentage: 0.55
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` Saldo: ${formatCurrency(ctx.parsed.y)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { size: 11 },
+                                callback: val => 'R$ ' + val.toLocaleString('pt-BR')
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 12, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // =========================================================================
+        // 9. MODAIS E CRUD (ISOLADO POR OWNER NO SUPABASE)
+        // =========================================================================
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        function openModal(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+        }
+
+        function populateCategorySelects() {
+            const filterSel = document.getElementById('categoryFilter');
+            const txSel = document.getElementById('txCategory');
+
+            filterSel.innerHTML = '<option value="all">Todas Categorias</option>';
+            txSel.innerHTML = '';
+
+            CATEGORIES.forEach(c => {
+                filterSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+                txSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+            });
+        }
+
+        function populateAccountSelects() {
+            const selects = ['accountFilter', 'txAccount', 'trFromAccount', 'trToAccount'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const prev = el.value;
+                el.innerHTML = id === 'accountFilter' ? '<option value="all">Todas as Contas</option>' : '';
+                accounts.forEach(a => {
+                    el.innerHTML += `<option value="${a.id}">${a.name}</option>`;
+                });
+                if (prev && [...el.options].some(o => o.value === prev)) {
+                    el.value = prev;
+                }
+            });
+        }
+
+        function setTxType(type) {
+            document.getElementById('txType').value = type;
+            const btnExp = document.getElementById('btnTypeExpense');
+            const btnInc = document.getElementById('btnTypeIncome');
+
+            if (type === 'expense') {
+                btnExp.className = 'py-2 rounded-lg text-xs font-bold transition bg-rose-500 text-white shadow';
+                btnInc.className = 'py-2 rounded-lg text-xs font-bold transition text-slate-500 dark:text-slate-400';
+            } else {
+                btnInc.className = 'py-2 rounded-lg text-xs font-bold transition bg-emerald-500 text-white shadow';
+                btnExp.className = 'py-2 rounded-lg text-xs font-bold transition text-slate-500 dark:text-slate-400';
+            }
+            handlePaymentMethodChange();
+        }
+
+        function handlePaymentMethodChange() {
+            const method = document.getElementById('txPaymentMethod').value;
+            const type = document.getElementById('txType').value;
+            const statusEl = document.getElementById('txStatus');
+
+            if (type === 'expense' && method === 'credit_card' && !document.getElementById('txId').value) {
+                statusEl.value = 'pending';
+            }
+        }
+
+        function openTransactionModal(txId = null) {
+            document.getElementById('txForm').reset();
+            document.getElementById('txId').value = '';
+            document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('txPaymentMethod').value = 'debit_pix';
+            document.getElementById('txStatus').value = 'paid';
+            setTxType('expense');
+
+            if (accounts.length > 0) {
+                document.getElementById('txAccount').value = accounts[0].id;
+            }
+
+            if (txId) {
+                const tx = transactions.find(t => t.id === txId);
+                if (tx) {
+                    document.getElementById('txModalTitle').textContent = 'Editar Transação';
+                    document.getElementById('txId').value = tx.id;
+                    setTxType(tx.type);
+                    document.getElementById('txDescription').value = tx.description;
+                    document.getElementById('txAmount').value = tx.amount;
+                    document.getElementById('txDate').value = tx.date;
+                    document.getElementById('txCategory').value = tx.category;
+                    document.getElementById('txAccount').value = tx.accountId;
+                    document.getElementById('txPaymentMethod').value = tx.paymentMethod || 'debit_pix';
+                    document.getElementById('txStatus').value = tx.status;
+                }
+            } else {
+                document.getElementById('txModalTitle').textContent = 'Nova Transação';
+            }
+
+            openModal('transactionModal');
+        }
+
+        async function saveTransaction(e) {
+            e.preventDefault();
+            const id = document.getElementById('txId').value;
+            const txData = {
+                id: id || `tx_${currentUser.id}_${Date.now()}`,
+                type: document.getElementById('txType').value,
+                description: document.getElementById('txDescription').value.trim(),
+                amount: parseFloat(document.getElementById('txAmount').value),
+                date: document.getElementById('txDate').value,
+                category: document.getElementById('txCategory').value,
+                accountId: document.getElementById('txAccount').value,
+                toAccountId: null,
+                paymentMethod: document.getElementById('txPaymentMethod').value || 'debit_pix',
+                status: document.getElementById('txStatus').value,
+                owner: currentUser.id
+            };
+
+            if (id) {
+                const idx = transactions.findIndex(t => t.id === id);
+                if (idx !== -1) transactions[idx] = txData;
+            } else {
+                transactions.push(txData);
+            }
+
+            saveLocalCache();
+            closeModal('transactionModal');
+            renderAll();
+
+            setSyncBadge('syncing', 'Salvando...');
+            const { error } = await sbClient.from('fin_lancamentos').upsert(mapTxToRow(txData));
+            if (error) {
+                console.error(error);
+                setSyncBadge('local', 'Erro ao salvar');
+                showToast('Erro ao salvar no Supabase: ' + error.message, 'error');
+            } else {
+                setSyncBadge('online', 'Supabase Conectado');
+                showToast('Lançamento salvo!', 'success');
+            }
+        }
+
+        async function toggleTxStatus(id) {
+            const tx = transactions.find(t => t.id === id);
+            if (!tx) return;
+
+            tx.status = tx.status === 'paid' ? 'pending' : 'paid';
+            saveLocalCache();
+            renderAll();
+
+            setSyncBadge('syncing', 'Atualizando...');
+            const { error } = await sbClient.from('fin_lancamentos').update({ status: tx.status }).eq('id', id).eq('owner', currentUser.id);
+            setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao salvar' : 'Supabase Conectado');
+        }
+
+        function requestDeleteTransaction(id) {
+            openConfirmDialog('Excluir Lançamento', 'Tem certeza que deseja excluir este lançamento?', async () => {
+                transactions = transactions.filter(t => t.id !== id);
+                saveLocalCache();
+                renderAll();
+
+                setSyncBadge('syncing', 'Excluindo...');
+                const { error } = await sbClient.from('fin_lancamentos').delete().eq('id', id).eq('owner', currentUser.id);
+                setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao excluir' : 'Supabase Conectado');
+                showToast('Lançamento excluído.', 'info');
+            });
+        }
+
+        // Contas
+        function openAccountModal(accId = null) {
+            document.getElementById('accForm').reset();
+            document.getElementById('accId').value = '';
+            document.getElementById('accColor').value = currentUser.color;
+            const delBtn = document.getElementById('btnDeleteAccount');
+            delBtn.classList.add('hidden');
+
+            if (accId) {
+                const acc = accounts.find(a => a.id === accId);
+                if (acc) {
+                    document.getElementById('accModalTitle').textContent = 'Editar Conta';
+                    document.getElementById('accId').value = acc.id;
+                    document.getElementById('accName').value = acc.name;
+                    document.getElementById('accType').value = acc.type;
+                    document.getElementById('accInitialBalance').value = acc.initialBalance;
+                    document.getElementById('accColor').value = acc.color || currentUser.color;
+                    if (accounts.length > 1) delBtn.classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('accModalTitle').textContent = 'Nova Conta';
+            }
+
+            openModal('accountModal');
+        }
+
+        async function saveAccount(e) {
+            e.preventDefault();
+            const id = document.getElementById('accId').value;
+            const accData = {
+                id: id || `acc_${currentUser.id}_${Date.now()}`,
+                name: document.getElementById('accName').value.trim(),
+                type: document.getElementById('accType').value,
+                initialBalance: parseFloat(document.getElementById('accInitialBalance').value) || 0,
+                color: document.getElementById('accColor').value,
+                icon: 'fa-mobile-screen',
+                owner: currentUser.id
+            };
+
+            if (id) {
+                const idx = accounts.findIndex(a => a.id === id);
+                if (idx !== -1) accounts[idx] = { ...accounts[idx], ...accData };
+            } else {
+                accounts.push(accData);
+            }
+
+            saveLocalCache();
+            closeModal('accountModal');
+            renderAll();
+
+            setSyncBadge('syncing', 'Salvando Conta...');
+            const { error } = await sbClient.from('fin_contas').upsert(mapAccountToRow(accData));
+            if (error) {
+                setSyncBadge('local', 'Erro ao salvar');
+                showToast('Erro ao salvar conta: ' + error.message, 'error');
+            } else {
+                setSyncBadge('online', 'Supabase Conectado');
+                showToast('Conta salva!', 'success');
+            }
+        }
+
+        function requestDeleteAccount() {
+            const id = document.getElementById('accId').value;
+            if (accounts.length <= 1) {
+                showToast('É necessário manter pelo menos uma conta ativa.', 'error');
+                return;
+            }
+            openConfirmDialog('Excluir Conta', 'Deseja excluir esta conta e seus lançamentos vinculados?', async () => {
+                accounts = accounts.filter(a => a.id !== id);
+                transactions = transactions.filter(t => t.accountId !== id);
+                saveLocalCache();
+                closeModal('accountModal');
+                renderAll();
+
+                setSyncBadge('syncing', 'Excluindo...');
+                const { error } = await sbClient.from('fin_contas').delete().eq('id', id).eq('owner', currentUser.id);
+                setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao excluir' : 'Supabase Conectado');
+                showToast('Conta excluída.', 'info');
+            });
+        }
+
+        // Transferências
+        function openTransferModal() {
+            if (accounts.length < 2) {
+                showToast('Cadastre pelo menos 2 contas em "Nova Conta" para transferir.', 'info');
+                return;
+            }
+            document.getElementById('trDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('trAmount').value = '';
+            document.getElementById('trDesc').value = '';
+            populateAccountSelects();
+            document.getElementById('trFromAccount').selectedIndex = 0;
+            document.getElementById('trToAccount').selectedIndex = 1;
+            openModal('transferModal');
+        }
+
+        async function saveTransfer(e) {
+            e.preventDefault();
+            const fromId = document.getElementById('trFromAccount').value;
+            const toId = document.getElementById('trToAccount').value;
+
+            if (fromId === toId) {
+                showToast('Selecione contas diferentes para origem e destino.', 'error');
+                return;
+            }
+
+            const trData = {
+                id: `tr_${currentUser.id}_${Date.now()}`,
+                type: 'transfer',
+                description: document.getElementById('trDesc').value.trim() || 'Transferência entre contas',
+                amount: parseFloat(document.getElementById('trAmount').value),
+                date: document.getElementById('trDate').value,
+                category: 'transfer',
+                accountId: fromId,
+                toAccountId: toId,
+                paymentMethod: 'debit_pix',
+                status: 'paid',
+                owner: currentUser.id
+            };
+
+            transactions.push(trData);
+            saveLocalCache();
+            closeModal('transferModal');
+            renderAll();
+
+            setSyncBadge('syncing', 'Transferindo...');
+            const { error } = await sbClient.from('fin_lancamentos').upsert(mapTxToRow(trData));
+            setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao salvar' : 'Supabase Conectado');
+            showToast('Transferência registrada!', 'success');
+        }
+
+        // =========================================================================
+        // 10. DADOS EXEMPLO, LIMPEZA & CSV
+        // =========================================================================
+        async function loadSampleData() {
+            const period = document.getElementById('periodFilter').value || '2026-11';
+            const accId = accounts[0]?.id || currentUser.defaultAccount.id;
+
+            const samples = [
+                { id: `ex_${currentUser.id}_${Date.now()}_1`, type: 'income', description: 'Recebimento Salário / Serviços', amount: 4500.00, date: `${period}-05`, category: 'servicos', accountId: accId, toAccountId: null, paymentMethod: 'debit_pix', status: 'paid', owner: currentUser.id },
+                { id: `ex_${currentUser.id}_${Date.now()}_2`, type: 'expense', description: 'Conta de Energia', amount: 342.80, date: `${period}-10`, category: 'energia', accountId: accId, toAccountId: null, paymentMethod: 'debit_pix', status: 'paid', owner: currentUser.id },
+                { id: `ex_${currentUser.id}_${Date.now()}_3`, type: 'expense', description: 'Plano Telefone / Internet', amount: 119.90, date: `${period}-12`, category: 'telefone', accountId: accId, toAccountId: null, paymentMethod: 'debit_pix', status: 'paid', owner: currentUser.id },
+                { id: `ex_${currentUser.id}_${Date.now()}_4`, type: 'expense', description: 'Compra Cartão de Crédito', amount: 450.00, date: `${period}-25`, category: 'lazer', accountId: accId, toAccountId: null, paymentMethod: 'credit_card', status: 'pending', owner: currentUser.id }
+            ];
+
+            transactions = [...transactions, ...samples];
+            saveLocalCache();
+            renderAll();
+
+            setSyncBadge('syncing', 'Enviando exemplos...');
+            const { error } = await sbClient.from('fin_lancamentos').upsert(samples.map(mapTxToRow));
+            setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao salvar' : 'Supabase Conectado');
+            showToast('Dados de exemplo adicionados!', 'success');
+        }
+
+        function requestConfirmClearAll() {
+            openConfirmDialog(
+                `Limpar Lançamentos (${currentUser.name})`,
+                `Deseja apagar todas as transações de ${currentUser.name}? Os dados do outro usuário e o saldo inicial das contas serão mantidos.`,
+                async () => {
+                    transactions = [];
+                    saveLocalCache();
+                    renderAll();
+
+                    setSyncBadge('syncing', 'Limpando...');
+                    const { error } = await sbClient.from('fin_lancamentos').delete().eq('owner', currentUser.id);
+                    setSyncBadge(error ? 'local' : 'online', error ? 'Erro ao limpar' : 'Supabase Conectado');
+                    showToast('Lançamentos limpos!', 'info');
+                }
+            );
+        }
+
+        function exportCSV() {
+            let csv = '\uFEFF';
+            csv += `PERFIL;${currentUser.name}\n\n`;
+            csv += 'RESUMO DE CONTAS\n';
+            csv += 'Conta;Tipo;Saldo Atual\n';
+            accounts.forEach(a => {
+                csv += `${a.name};${a.type};${getAccountBalance(a.id).toFixed(2).replace('.', ',')}\n`;
+            });
+
+            csv += '\nLANÇAMENTOS\n';
+            csv += 'Data;Tipo;Descrição;Categoria;Conta;Pagamento;Valor;Status\n';
+            transactions.forEach(tx => {
+                const cat = CATEGORIES.find(c => c.id === tx.category)?.name || 'Transferência';
+                const acc = accounts.find(a => a.id === tx.accountId)?.name || '';
+                const tipo = tx.type === 'income' ? 'Receita' : (tx.type === 'expense' ? 'Despesa' : 'Transferência');
+                const pgto = tx.paymentMethod === 'credit_card' ? 'Cartão de Crédito' : 'Débito/PIX';
+                const status = tx.status === 'paid' ? 'Pago' : 'Pendente';
+                csv += `${formatDateBR(tx.date)};${tipo};"${tx.description}";${cat};${acc};${pgto};${parseFloat(tx.amount).toFixed(2).replace('.', ',')};${status}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `financas_${currentUser.id}_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
